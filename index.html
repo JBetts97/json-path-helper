@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>JSON → PHP Path Helper</title>
+  <style>
+    :root {
+      --bg: #0f172a; /* slate-900 */
+      --panel: #111827; /* gray-900 */
+      --muted: #334155; /* slate-700 */
+      --text: #e5e7eb; /* gray-200 */
+      --accent: #22d3ee; /* cyan-400 */
+      --accent-2: #a78bfa; /* violet-400 */
+      --error: #f87171; /* red-400 */
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font: 14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    }
+    header { padding: 14px 18px; border-bottom: 1px solid #1f2937; display:flex; gap:14px; align-items:center; }
+    header h1 { margin: 0; font-size: 16px; letter-spacing: .2px; }
+    header .small { opacity:.8; font-size:12px }
+    main { display: grid; grid-template-columns: 1.1fr 1.4fr; gap: 14px; padding: 14px; height: calc(100vh - 52px); }
+    .card { background: var(--panel); border:1px solid #1f2937; border-radius: 12px; overflow: hidden; display:flex; flex-direction:column; }
+    .card header { border:0; background: rgba(255,255,255,0.02); }
+    .card header h2 { margin:0; font-size: 13px; text-transform: uppercase; letter-spacing: .12em; color:#cbd5e1; }
+    .card .body { padding: 12px; overflow:auto; }
+
+    textarea { width: 100%; min-height: 180px; resize: vertical; background: #0b1220; color: var(--text);
+      border:1px solid #1f2937; border-radius: 10px; padding: 10px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+
+    .row { display:flex; gap:10px; align-items:center; flex-wrap: wrap; }
+    .btn { background: #0b1324; color: var(--text); border:1px solid #1f2937; padding:8px 12px; border-radius: 10px; cursor:pointer; font-weight:600 }
+    .btn:hover { border-color: #334155 }
+    .btn.min { padding: 6px 8px; font-size: 12px; }
+    .ghost { background: transparent }
+    .accent { border-color: var(--accent); color: var(--accent) }
+
+    .error { color: var(--error); margin-top:6px }
+
+    .tree { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 13px; line-height: 1.45; }
+    .tree ul { list-style: none; padding-left: 14px; margin: 0; }
+    .tree li { position: relative; margin: 2px 0; }
+    .tree .node { display:inline-flex; align-items:center; gap:6px; padding: 2px 6px; border-radius: 8px; cursor: pointer; }
+    .tree .node:hover { background: #0b1220; }
+    .tree .node.active { outline: 1px dashed var(--accent); background: #0b1220; }
+    .key { color: #93c5fd; }
+    .index { color: #60a5fa; }
+    .type { color: #a3a3a3; font-size: 11px; padding-left: 4px; }
+    .val-preview { color: #a7f3d0; opacity:.85; }
+
+    .paths { display:grid; grid-template-columns: 1fr; gap:10px; }
+    .path { background: #0b1220; border:1px solid #1f2937; border-radius: 10px; padding: 8px; }
+    .path .label { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color:#cbd5e1; display:flex; align-items:center; justify-content:space-between; margin-bottom:6px }
+    .path code { display:block; word-break: break-all; white-space: pre-wrap; }
+
+    .footer { padding: 10px 12px; border-top:1px solid #1f2937; display:flex; gap:10px; align-items:center; justify-content:space-between; }
+    .muted { color:#9ca3af }
+
+    @media (max-width: 980px){ main{ grid-template-columns: 1fr; height:auto } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>JSON → PHP Path Helper</h1>
+    <span class="small">Paste JSON, click any node, copy the access path.</span>
+  </header>
+  <main>
+    <!-- LEFT: Input + Tree -->
+    <section class="card">
+      <header><h2>Input JSON</h2></header>
+      <div class="body" style="gap:10px; display:flex; flex-direction:column;">
+        <textarea id="jsonInput" placeholder='Paste JSON here...'>{
+  "order": {
+    "extension_attributes": { "method": "courier" },
+    "items": [
+      { "sku": "ABC", "qty": 2 },
+      { "sku": "XYZ", "qty": 1 }
+    ]
+  }
+}</textarea>
+        <div class="row">
+          <button id="parseBtn" class="btn accent">Parse JSON</button>
+          <button id="expandAllBtn" class="btn min">Expand all</button>
+          <button id="collapseAllBtn" class="btn min">Collapse all</button>
+        </div>
+        <div id="error" class="error" hidden></div>
+      </div>
+    </section>
+
+    <!-- RIGHT: Tree + Paths -->
+    <section class="card" style="min-height: 320px;">
+      <header><h2>JSON Tree & Paths</h2></header>
+      <div class="body" style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; min-height:0;">
+        <div class="tree" id="tree" aria-live="polite"></div>
+        <div class="paths" id="paths">
+          <div class="path">
+            <div class="label">PHP <button class="btn min ghost" data-copy="php">Copy</button></div>
+            <code id="out-php">—</code>
+          </div>
+          <div class="path">
+            <div class="label">JavaScript <button class="btn min ghost" data-copy="js">Copy</button></div>
+            <code id="out-js">—</code>
+          </div>
+          <div class="path">
+            <div class="label">JSONPath <button class="btn min ghost" data-copy="jsonpath">Copy</button></div>
+            <code id="out-jsonpath">—</code>
+          </div>
+          <div class="path">
+            <div class="label">JSON Pointer <button class="btn min ghost" data-copy="pointer">Copy</button></div>
+            <code id="out-pointer">—</code>
+          </div>
+          <div class="path">
+            <div class="label">Value preview</div>
+            <code id="out-value">—</code>
+          </div>
+        </div>
+      </div>
+      <div class="footer">
+        <span class="muted">Tip: Click any key or index in the tree to generate paths.</span>
+        <div class="row">
+          <label class="muted" style="display:flex; gap:8px; align-items:center;">
+            <input type="checkbox" id="jsStartData" checked />
+            <span>Start JS path with <code>data</code></span>
+          </label>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // Utilities
+    const isPlainObject = (v) => Object.prototype.toString.call(v) === '[object Object]';
+    const escapeSingleQuotes = (s) => String(s).replace(/'/g, "\\'");
+    const isValidJsIdent = (k) => /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(k);
+
+    function phpPath(segments){
+      return segments.reduce((acc, seg) => {
+        if(seg.type === 'key') return acc + "['" + escapeSingleQuotes(seg.value) + "']";
+        return acc + "[" + seg.value + "]"; // index
+      }, '$data');
+    }
+    function jsPath(segments, startWithData=true){
+      let out = startWithData ? 'data' : '';
+      for(const seg of segments){
+        if(seg.type === 'index') out += `[${seg.value}]`;
+        else out += isValidJsIdent(seg.value) ? (out ? `.${seg.value}` : seg.value) : `['${escapeSingleQuotes(seg.value)}']`;
+      }
+      return out || 'data';
+    }
+    function jsonPath(segments){
+      let out = '$';
+      for(const seg of segments){
+        if(seg.type === 'index') out += `[${seg.value}]`;
+        else out += isValidJsIdent(seg.value) ? `.${seg.value}` : `['${escapeSingleQuotes(seg.value)}']`;
+      }
+      return out;
+    }
+    function jsonPointer(segments){
+      const enc = (s) => String(s).replace(/~/g, '~0').replace(/\//g, '~1');
+      return '/' + segments.map(s => s.type === 'index' ? String(s.value) : enc(s.value)).join('/');
+    }
+
+    // Build a tree view
+    function buildTree(root, container){
+      container.innerHTML = '';
+      const ul = document.createElement('ul');
+      ul.style.paddingLeft = '0';
+      container.appendChild(ul);
+      renderNode(root, [], ul, { depth:0 });
+    }
+
+    function renderNode(value, path, parentUl, ctx){
+      if(isPlainObject(value)){
+        const entries = Object.entries(value);
+        entries.forEach(([k, v]) => {
+          const li = document.createElement('li');
+          const node = document.createElement('span');
+          node.className = 'node';
+          node.dataset.path = JSON.stringify([...path, {type:'key', value:k}]);
+          node.innerHTML = `<span class="key">${k}</span><span class="type">${labelOf(v)}</span> ${previewOf(v)}`;
+          node.onclick = () => selectNode(node, v);
+          li.appendChild(node);
+          const childUl = document.createElement('ul');
+          childUl.hidden = true;
+          li.appendChild(childUl);
+          node.addEventListener('dblclick', () => childUl.hidden = !childUl.hidden);
+          parentUl.appendChild(li);
+          renderNode(v, [...path, {type:'key', value:k}], childUl, { depth: ctx.depth+1 });
+        });
+      } else if (Array.isArray(value)){
+        value.forEach((v, i) => {
+          const li = document.createElement('li');
+          const node = document.createElement('span');
+          node.className = 'node';
+          node.dataset.path = JSON.stringify([...path, {type:'index', value:i}]);
+          node.innerHTML = `<span class="index">[${i}]</span><span class="type">${labelOf(v)}</span> ${previewOf(v)}`;
+          node.onclick = () => selectNode(node, v);
+          li.appendChild(node);
+          const childUl = document.createElement('ul');
+          childUl.hidden = true;
+          li.appendChild(childUl);
+          node.addEventListener('dblclick', () => childUl.hidden = !childUl.hidden);
+          parentUl.appendChild(li);
+          renderNode(v, [...path, {type:'index', value:i}], childUl, { depth: ctx.depth+1 });
+        });
+      } else {
+        // primitive leaf
+        const li = document.createElement('li');
+        li.innerHTML = `<span class="node" style="cursor:default"><span class="type">${labelOf(value)}</span> ${previewOf(value)}</span>`;
+        parentUl.appendChild(li);
+      }
+    }
+
+    function labelOf(v){
+      if(isPlainObject(v)) return '{object}';
+      if(Array.isArray(v)) return '[array]';
+      return typeof v;
+    }
+    function previewOf(v){
+      const small = (s) => `<span class="val-preview">${s}</span>`;
+      if(isPlainObject(v) || Array.isArray(v)) return '';
+      if(typeof v === 'string') return small(JSON.stringify(v));
+      if(v === null) return small('null');
+      return small(String(v));
+    }
+
+    function selectNode(nodeEl, value){
+      document.querySelectorAll('.tree .node').forEach(n => n.classList.remove('active'));
+      nodeEl.classList.add('active');
+      const segs = JSON.parse(nodeEl.dataset.path);
+      updateOutputs(segs, value);
+    }
+
+    function updateOutputs(segments, value){
+      const startWithData = document.getElementById('jsStartData').checked;
+      document.getElementById('out-php').textContent = phpPath(segments);
+      document.getElementById('out-js').textContent = jsPath(segments, startWithData);
+      document.getElementById('out-jsonpath').textContent = jsonPath(segments);
+      document.getElementById('out-pointer').textContent = jsonPointer(segments);
+      document.getElementById('out-value').textContent = formatValue(value);
+    }
+    function formatValue(v){
+      try { return JSON.stringify(v, null, 2); } catch { return String(v); }
+    }
+
+    // Expand/Collapse helpers
+    function setAllHidden(hidden){
+      document.querySelectorAll('.tree ul ul').forEach(ul => ul.hidden = hidden);
+    }
+
+    // Copy buttons
+    document.addEventListener('click', (e) => {
+      const copyKey = e.target?.dataset?.copy;
+      if(copyKey){
+        const el = document.getElementById(`out-${copyKey}`);
+        if(el){
+          navigator.clipboard.writeText(el.textContent).then(() => {
+            e.target.textContent = 'Copied!';
+            setTimeout(()=>{ e.target.textContent = 'Copy'; }, 800);
+          });
+        }
+      }
+    });
+
+    // Parse handling
+    function parseAndRender(){
+      const input = document.getElementById('jsonInput').value;
+      const errEl = document.getElementById('error');
+      try {
+        const data = JSON.parse(input);
+        errEl.hidden = true; errEl.textContent = '';
+        buildTree(data, document.getElementById('tree'));
+        setAllHidden(false); // expand by default after parse
+        // Auto-select first node if available
+        const first = document.querySelector('.tree .node');
+        if(first){ first.click(); }
+      } catch (ex) {
+        errEl.hidden = false; errEl.textContent = 'Invalid JSON: ' + ex.message;
+        document.getElementById('tree').innerHTML = '';
+        ['php','js','jsonpath','pointer','value'].forEach(k=> document.getElementById('out-'+k).textContent = '—');
+      }
+    }
+
+    // Events
+    document.getElementById('parseBtn').addEventListener('click', parseAndRender);
+    document.getElementById('expandAllBtn').addEventListener('click', () => setAllHidden(false));
+    document.getElementById('collapseAllBtn').addEventListener('click', () => setAllHidden(true));
+    document.getElementById('jsStartData').addEventListener('change', () => {
+      const active = document.querySelector('.tree .node.active');
+      if(active){ active.click(); }
+    });
+
+    // Initial render
+    parseAndRender();
+  </script>
+</body>
+</html>
+
