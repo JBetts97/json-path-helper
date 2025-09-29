@@ -122,6 +122,24 @@
       const paths = document.getElementById('paths');
       const footer = document.getElementById('output-path-footer');
       if (paths && footer) {
+        paths.style.margin = '0 auto';
+        paths.style.maxWidth = '100%';
+        paths.style.display = 'flex';
+        paths.style.flexDirection = 'column';
+        paths.style.alignItems = 'center';
+        // Make output path card more visually distinct
+        const pathCards = paths.querySelectorAll('.path');
+        pathCards.forEach(card => {
+          card.style.margin = '8px 0';
+          card.style.width = '100%';
+          card.style.maxWidth = '480px';
+        });
+        // Make copy button always visible
+        const btns = paths.querySelectorAll('button');
+        btns.forEach(btn => {
+          btn.style.position = 'static';
+          btn.style.marginLeft = '8px';
+        });
         footer.appendChild(paths);
       }
     }
@@ -202,9 +220,9 @@
           renderNode(v, [...path, {type:'index', value:i}], childUl, { depth: ctx.depth+1 });
         });
       } else {
-        // primitive leaf
+        // primitive leaf: do not show preview (value is already in label above)
         const li = document.createElement('li');
-        li.innerHTML = `<span class="node" style="cursor:default"><span class="type">${labelOf(value)}</span> ${previewOf(value)}</span>`;
+        li.innerHTML = `<span class="node" style="cursor:default"><span class="type">${labelOf(value)}</span></span>`;
         parentUl.appendChild(li);
       }
     }
