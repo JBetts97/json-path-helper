@@ -96,6 +96,15 @@
       <div class="body" style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; min-height:0;">
         <div class="tree" id="tree" aria-live="polite"></div>
         <div class="paths" id="paths">
+          <div class="row" style="margin-bottom:10px; gap:10px;">
+            <label for="objectName" class="muted">Object name:</label>
+            <input id="objectName" type="text" value="myObject" style="width:110px; background:#0b1220; color:var(--text); border:1px solid #1f2937; border-radius:6px; padding:3px 7px;" />
+            <label for="langSelect" class="muted">Language:</label>
+            <select id="langSelect" style="background:#0b1220; color:var(--text); border:1px solid #1f2937; border-radius:6px; padding:3px 7px;">
+              <option value="js">JavaScript</option>
+              <option value="python">Python</option>
+            </select>
+          </div>
           <div class="path">
             <div class="label">PHP <button class="btn min ghost" data-copy="php">Copy</button></div>
             <code id="out-php">—</code>
@@ -115,6 +124,10 @@
           <div class="path">
             <div class="label">Value preview</div>
             <code id="out-value">—</code>
+          </div>
+          <div class="path">
+            <div class="label">Generated Code <button class="btn min ghost" id="copyGeneratedBtn">Copy (Ctrl+Shift+C)</button></div>
+            <code id="out-generated" style="white-space:pre;">—</code>
           </div>
         </div>
       </div>
@@ -241,6 +254,44 @@
       document.getElementById('out-jsonpath').textContent = jsonPath(segments);
       document.getElementById('out-pointer').textContent = jsonPointer(segments);
       document.getElementById('out-value').textContent = formatValue(value);
+
+      // Generate code snippet for selected language
+      const objName = document.getElementById('objectName').value || 'myObject';
+      const lang = document.getElementById('langSelect').value;
+      let code = '';
+      if (lang === 'js') {
+        code = `const ${objName} = ${formatValue(value)};`;
+      } else if (lang === 'python') {
+        code = `${objName} = ${formatPythonValue(value)}`;
+      } else {
+        code = '// Not implemented';
+      }
+      document.getElementById('out-generated').textContent = code;
+    }
+
+    // Helper to format Python values
+    function formatPythonValue(v) {
+      try {
+        return pyStringify(v, 0);
+      } catch {
+        return String(v);
+      }
+    }
+    function pyStringify(v, indent) {
+      const pad = (n) => '  '.repeat(n);
+      if (v === null) return 'None';
+      if (typeof v === 'string') return `"${v.replace(/"/g, '\"')}"`;
+      if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+      if (Array.isArray(v)) {
+        if (v.length === 0) return '[]';
+        return '[\n' + v.map(x => pad(indent+1) + pyStringify(x, indent+1)).join(',\n') + '\n' + pad(indent) + ']';
+      }
+      if (typeof v === 'object') {
+        const keys = Object.keys(v);
+        if (keys.length === 0) return '{}';
+        return '{\n' + keys.map(k => pad(indent+1) + pyStringify(k,0) + ': ' + pyStringify(v[k], indent+1)).join(',\n') + '\n' + pad(indent) + '}';
+      }
+      return String(v);
     }
     function formatValue(v){
       try { return JSON.stringify(v, null, 2); } catch { return String(v); }
@@ -262,6 +313,29 @@
             setTimeout(()=>{ e.target.textContent = 'Copy'; }, 800);
           });
         }
+      }
+      // Copy generated code button
+      if (e.target?.id === 'copyGeneratedBtn') {
+        const code = document.getElementById('out-generated').textContent;
+        navigator.clipboard.writeText(code).then(() => {
+          e.target.textContent = 'Copied!';
+          setTimeout(()=>{ e.target.textContent = 'Copy (Ctrl+Shift+C)'; }, 800);
+        });
+      }
+    });
+
+    // Keybinding: Ctrl+Shift+C to copy generated code
+    document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === 'KeyC') {
+        const code = document.getElementById('out-generated').textContent;
+        navigator.clipboard.writeText(code).then(() => {
+          const btn = document.getElementById('copyGeneratedBtn');
+          if (btn) {
+            btn.textContent = 'Copied!';
+            setTimeout(()=>{ btn.textContent = 'Copy (Ctrl+Shift+C)'; }, 800);
+          }
+        });
+        e.preventDefault();
       }
     });
 
@@ -289,6 +363,14 @@
     document.getElementById('expandAllBtn').addEventListener('click', () => setAllHidden(false));
     document.getElementById('collapseAllBtn').addEventListener('click', () => setAllHidden(true));
     document.getElementById('jsStartData').addEventListener('change', () => {
+      const active = document.querySelector('.tree .node.active');
+      if(active){ active.click(); }
+    });
+    document.getElementById('objectName').addEventListener('input', () => {
+      const active = document.querySelector('.tree .node.active');
+      if(active){ active.click(); }
+    });
+    document.getElementById('langSelect').addEventListener('change', () => {
       const active = document.querySelector('.tree .node.active');
       if(active){ active.click(); }
     });
