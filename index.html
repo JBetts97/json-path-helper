@@ -103,31 +103,20 @@
             <select id="langSelect" style="background:#0b1220; color:var(--text); border:1px solid #1f2937; border-radius:6px; padding:3px 7px;">
               <option value="js">JavaScript</option>
               <option value="python">Python</option>
+              <option value="php">PHP</option>
             </select>
           </div>
-          <div class="path">
-            <div class="label">PHP <button class="btn min ghost" data-copy="php">Copy</button></div>
-            <code id="out-php">—</code>
+          <div class="path" id="path-js" style="display:none;">
+            <div class="label">JavaScript Path <button class="btn min ghost" id="copyGeneratedBtn-js">Copy (Ctrl+Shift+C)</button></div>
+            <code id="out-generated-js" style="white-space:pre;">—</code>
           </div>
-          <div class="path">
-            <div class="label">JavaScript <button class="btn min ghost" data-copy="js">Copy</button></div>
-            <code id="out-js">—</code>
+          <div class="path" id="path-python" style="display:none;">
+            <div class="label">Python Path <button class="btn min ghost" id="copyGeneratedBtn-python">Copy (Ctrl+Shift+C)</button></div>
+            <code id="out-generated-python" style="white-space:pre;">—</code>
           </div>
-          <div class="path">
-            <div class="label">JSONPath <button class="btn min ghost" data-copy="jsonpath">Copy</button></div>
-            <code id="out-jsonpath">—</code>
-          </div>
-          <div class="path">
-            <div class="label">JSON Pointer <button class="btn min ghost" data-copy="pointer">Copy</button></div>
-            <code id="out-pointer">—</code>
-          </div>
-          <div class="path">
-            <div class="label">Value preview</div>
-            <code id="out-value">—</code>
-          </div>
-          <div class="path">
-            <div class="label">Generated Code <button class="btn min ghost" id="copyGeneratedBtn">Copy (Ctrl+Shift+C)</button></div>
-            <code id="out-generated" style="white-space:pre;">—</code>
+          <div class="path" id="path-php" style="display:none;">
+            <div class="label">PHP Path <button class="btn min ghost" id="copyGeneratedBtn-php">Copy (Ctrl+Shift+C)</button></div>
+            <code id="out-generated-php" style="white-space:pre;">—</code>
           </div>
         </div>
       </div>
@@ -248,25 +237,37 @@
     }
 
     function updateOutputs(segments, value){
-      const startWithData = document.getElementById('jsStartData').checked;
-      document.getElementById('out-php').textContent = phpPath(segments);
-      document.getElementById('out-js').textContent = jsPath(segments, startWithData);
-      document.getElementById('out-jsonpath').textContent = jsonPath(segments);
-      document.getElementById('out-pointer').textContent = jsonPointer(segments);
-      document.getElementById('out-value').textContent = formatValue(value);
+      // Hide all path outputs
+      document.getElementById('path-js').style.display = 'none';
+      document.getElementById('path-python').style.display = 'none';
+      document.getElementById('path-php').style.display = 'none';
 
-      // Generate code snippet for selected language
       const objName = document.getElementById('objectName').value || 'myObject';
       const lang = document.getElementById('langSelect').value;
-      let code = '';
+      let pathExpr = '';
       if (lang === 'js') {
-        code = `const ${objName} = ${formatValue(value)};`;
+        pathExpr = jsPath(segments, false).replace(/^data/, objName || 'myObject');
+        document.getElementById('out-generated-js').textContent = pathExpr;
+        document.getElementById('path-js').style.display = '';
       } else if (lang === 'python') {
-        code = `${objName} = ${formatPythonValue(value)}`;
-      } else {
-        code = '// Not implemented';
+        pathExpr = pythonPath(segments, objName || 'myObject');
+        document.getElementById('out-generated-python').textContent = pathExpr;
+        document.getElementById('path-python').style.display = '';
+      } else if (lang === 'php') {
+        pathExpr = phpPath(segments).replace('$data', '$' + (objName || 'myObject'));
+        document.getElementById('out-generated-php').textContent = pathExpr;
+        document.getElementById('path-php').style.display = '';
       }
-      document.getElementById('out-generated').textContent = code;
+    }
+
+    // Python path generator
+    function pythonPath(segments, objName) {
+      let out = objName;
+      for(const seg of segments){
+        if(seg.type === 'index') out += `[${seg.value}]`;
+        else out += `["${seg.value}"]`;
+      }
+      return out;
     }
 
     // Helper to format Python values
@@ -314,9 +315,10 @@
           });
         }
       }
-      // Copy generated code button
-      if (e.target?.id === 'copyGeneratedBtn') {
-        const code = document.getElementById('out-generated').textContent;
+      // Copy generated path button (per language)
+      if (e.target?.id?.startsWith('copyGeneratedBtn-')) {
+        const lang = e.target.id.replace('copyGeneratedBtn-','');
+        const code = document.getElementById('out-generated-' + lang).textContent;
         navigator.clipboard.writeText(code).then(() => {
           e.target.textContent = 'Copied!';
           setTimeout(()=>{ e.target.textContent = 'Copy (Ctrl+Shift+C)'; }, 800);
@@ -324,12 +326,13 @@
       }
     });
 
-    // Keybinding: Ctrl+Shift+C to copy generated code
+    // Keybinding: Ctrl+Shift+C to copy generated path for selected language
     document.addEventListener('keydown', (e) => {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === 'KeyC') {
-        const code = document.getElementById('out-generated').textContent;
+        const lang = document.getElementById('langSelect').value;
+        const code = document.getElementById('out-generated-' + lang).textContent;
         navigator.clipboard.writeText(code).then(() => {
-          const btn = document.getElementById('copyGeneratedBtn');
+          const btn = document.getElementById('copyGeneratedBtn-' + lang);
           if (btn) {
             btn.textContent = 'Copied!';
             setTimeout(()=>{ btn.textContent = 'Copy (Ctrl+Shift+C)'; }, 800);
