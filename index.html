@@ -68,7 +68,7 @@
     <span class="small">Paste JSON, click any node, copy the access path.</span>
   </header>
   <main>
-    <!-- LEFT: Input + Tree -->
+    <!-- LEFT: Input JSON -->
     <section class="card">
       <header><h2>Input JSON</h2></header>
       <div class="body" style="gap:10px; display:flex; flex-direction:column;">
@@ -90,13 +90,13 @@
       </div>
     </section>
 
-    <!-- RIGHT: Tree + Paths -->
-    <section class="card" style="min-height: 320px;">
-      <header><h2>JSON Tree & Paths</h2></header>
-      <div class="body" style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; min-height:0;">
-        <div class="tree" id="tree" aria-live="polite"></div>
-        <div class="paths" id="paths">
-          <div class="row" style="margin-bottom:10px; gap:10px;">
+    <!-- RIGHT: Controls + Tree + Output -->
+    <section class="card" style="min-height: 320px; display:flex; flex-direction:column;">
+      <header><h2>JSON Tree & Path</h2></header>
+      <div class="body" style="flex:1; display:flex; flex-direction:column; min-height:0;">
+        <!-- Controls Card -->
+        <div class="card" style="margin-bottom:12px;">
+          <div class="body" style="display:flex; gap:16px; align-items:center;">
             <label for="objectName" class="muted">Object name:</label>
             <input id="objectName" type="text" value="myObject" style="width:110px; background:#0b1220; color:var(--text); border:1px solid #1f2937; border-radius:6px; padding:3px 7px;" />
             <label for="langSelect" class="muted">Language:</label>
@@ -106,33 +106,26 @@
               <option value="php">PHP</option>
             </select>
           </div>
-          <div class="path" id="path-js" style="display:none;">
-            <div class="label">JavaScript Path <button class="btn min ghost" id="copyGeneratedBtn-js">Copy (Ctrl+Shift+C)</button></div>
-            <code id="out-generated-js" style="white-space:pre;">—</code>
-          </div>
-          <div class="path" id="path-python" style="display:none;">
-            <div class="label">Python Path <button class="btn min ghost" id="copyGeneratedBtn-python">Copy (Ctrl+Shift+C)</button></div>
-            <code id="out-generated-python" style="white-space:pre;">—</code>
-          </div>
-          <div class="path" id="path-php" style="display:none;">
-            <div class="label">PHP Path <button class="btn min ghost" id="copyGeneratedBtn-php">Copy (Ctrl+Shift+C)</button></div>
-            <code id="out-generated-php" style="white-space:pre;">—</code>
-          </div>
         </div>
+        <!-- Tree -->
+        <div class="tree" id="tree" aria-live="polite" style="flex:1 1 auto;"></div>
       </div>
       <div class="footer">
-        <span class="muted">Tip: Click any key or index in the tree to generate paths.</span>
-        <div class="row">
-          <label class="muted" style="display:flex; gap:8px; align-items:center;">
-            <input type="checkbox" id="jsStartData" checked />
-            <span>Start JS path with <code>data</code></span>
-          </label>
-        </div>
+        <div id="output-path-footer"></div>
       </div>
     </section>
   </main>
 
   <script>
+    // Move output path UI to footer on load
+    function movePathOutputToFooter() {
+      const paths = document.getElementById('paths');
+      const footer = document.getElementById('output-path-footer');
+      if (paths && footer) {
+        footer.appendChild(paths);
+      }
+    }
+    window.addEventListener('DOMContentLoaded', movePathOutputToFooter);
     // Utilities
     const isPlainObject = (v) => Object.prototype.toString.call(v) === '[object Object]';
     const escapeSingleQuotes = (s) => String(s).replace(/'/g, "\\'");
@@ -365,10 +358,6 @@
     document.getElementById('parseBtn').addEventListener('click', parseAndRender);
     document.getElementById('expandAllBtn').addEventListener('click', () => setAllHidden(false));
     document.getElementById('collapseAllBtn').addEventListener('click', () => setAllHidden(true));
-    document.getElementById('jsStartData').addEventListener('change', () => {
-      const active = document.querySelector('.tree .node.active');
-      if(active){ active.click(); }
-    });
     document.getElementById('objectName').addEventListener('input', () => {
       const active = document.querySelector('.tree .node.active');
       if(active){ active.click(); }
